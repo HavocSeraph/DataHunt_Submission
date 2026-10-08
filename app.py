@@ -2,10 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# 1. Page Config & Custom CSS
-st.set_page_config(layout="wide", page_title="Executive Dashboard", page_icon="📊")
+# 1. Page Configuration
+st.set_page_config(
+    page_title="Executive Sales Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Inject custom CSS to hide Streamlit header/footer/menu and add sleek aesthetic polish
+# 2. Custom CSS Injection (Hide main menu, header, footer & reduce top padding)
 st.markdown("""
 <style>
     /* Hide Streamlit default header, footer, and main menu */
@@ -13,18 +17,24 @@ st.markdown("""
     header {visibility: hidden;}
     footer {visibility: hidden;}
 
-    /* Modern Dark Theme Background and Container Tweaks */
+    /* Remove heavy top padding for a clean SaaS app look */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+    }
+
+    /* Dark Mode App Background */
     .stApp {
         background-color: #0E1117;
         color: #FAFAFA;
     }
     
-    /* Custom Styling for Metric Cards */
+    /* Styled Metric Cards */
     div[data-testid="stMetric"] {
         background: rgba(38, 39, 48, 0.6);
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 12px;
-        padding: 18px 24px;
+        padding: 16px 20px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         transition: transform 0.2s ease, border-color 0.2s ease;
     }
@@ -33,61 +43,64 @@ st.markdown("""
         border-color: rgba(0, 240, 255, 0.4);
     }
 
-    /* Custom Expander Styling */
+    /* Expander Styling */
     div[data-testid="stExpander"] {
         background: rgba(38, 39, 48, 0.4);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 10px;
     }
 
-    /* Custom Tab Styling */
+    /* Tab Styling */
     button[data-baseweb="tab"] {
-        font-size: 1.05rem !important;
+        font-size: 1rem !important;
         font-weight: 600 !important;
-        padding: 10px 20px !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# 2. Header and Interactive Expander for Data Cleaning Pipeline
-st.title("📊 Data Hunt: Executive Dashboard")
-with st.expander("🛠️ View Data Cleaning Pipeline"):
-    st.write(
-        "1. **Removed exact row duplicates**.\n"
-        "2. **Nullified negative `shipping_days`**.\n"
-        "3. **Clamped `discount_pct`** strictly between `0.0` and `1.0`.\n"
-        "4. **Dropped null values** to ensure accurate mathematical calculations."
-    )
-st.divider()
-
-# 3. Load and Clean Data
+# 3. Data Loading & Cleaning Function
 @st.cache_data
 def load_data():
     df = pd.read_csv('THE_DATA_HUNT_dataset.csv')
-    # Core Cleaning Steps
+    # a) Drop exact duplicates
     df = df.drop_duplicates()
+    # b) Nullify negative shipping_days using a lambda function
     df['shipping_days'] = df['shipping_days'].apply(lambda x: x if pd.notnull(x) and x >= 0 else None)
+    # c) Clamp discount_pct strictly between 0.0 and 1.0
     df['discount_pct'] = df['discount_pct'].apply(lambda x: x if pd.notnull(x) and 0 <= x <= 1 else None)
+    # d) Drop nulls to ensure accurate aggregations
     df = df.dropna()
+    # e) Convert order_date to datetime
     df['order_date'] = pd.to_datetime(df['order_date'])
     return df
 
 df = load_data()
 
-# 4. Interactive Sidebar Filters
+# 4. Header & Collapsed Data Cleaning Steps Expander
+st.title("📊 Executive Sales Dashboard")
+with st.expander("🛠️ View Data Cleaning Pipeline", expanded=False):
+    st.write(
+        "1. **Dropped exact row duplicates**.\n"
+        "2. **Nullified negative `shipping_days`** using a lambda function.\n"
+        "3. **Clamped `discount_pct`** strictly between 0.0 and 1.0.\n"
+        "4. **Dropped null values** to ensure accurate aggregations."
+    )
+st.divider()
+
+# 5. Interactive Sidebar Filters
 st.sidebar.header("⚡ Interactive Filters")
 cat_filter = st.sidebar.multiselect("Select Category", df['category'].unique(), default=df['category'].unique())
 reg_filter = st.sidebar.multiselect("Select Region", df['region'].unique(), default=df['region'].unique())
 seg_filter = st.sidebar.multiselect("Select Segment", df['segment'].unique(), default=df['segment'].unique())
 
-# Dynamically filter dataframe based on sidebar inputs
+# Dynamic Filtering
 filtered_df = df[
     (df['category'].isin(cat_filter)) & 
     (df['region'].isin(reg_filter)) & 
     (df['segment'].isin(seg_filter))
 ]
 
-# 5. Advanced KPI Metrics Section
+# 6. Advanced KPIs Section
 st.subheader("Performance KPIs")
 col1, col2, col3, col4 = st.columns(4)
 
@@ -101,22 +114,21 @@ return_rate = (returns_count / total_orders * 100) if total_orders > 0 else 0
 col1.metric("Total Revenue", f"${total_revenue:,.0f}", delta="Primary KPI", delta_color="normal")
 col2.metric("Total Profit", f"${total_profit:,.0f}", delta=f"{profit_margin:.1f}% Margin", delta_color="normal" if profit_margin >= 0 else "inverse")
 col3.metric("Total Orders", f"{total_orders:,}", delta="Order Volume", delta_color="off")
-col4.metric("Return Rate", f"{return_rate:.2f}%", delta="Critical Metric", delta_color="inverse")
+col4.metric("Return Rate", f"{return_rate:.2f}%", delta="Action Required", delta_color="inverse")
 
 st.divider()
 
-# 6. Tabbed & Multi-Column Visualization Layout
+# 7. Professional Plotly Visualizations (2x2 Layout with Tabs)
 st.subheader("Executive Insights")
-tab1, tab2 = st.tabs(["📊 Overview & Financial Trends", "📍 Category & City Analysis"])
+tab1, tab2 = st.tabs(["📊 Financial Performance", "📍 Category & City Analysis"])
 
-# Palette Configuration for Plotly Dark Theme
 COLOR_PRIMARY = ["#00F0FF", "#FF007F"]
 COLOR_ACCENT = ["#00F0FF"]
 
 with tab1:
     row1_col1, row1_col2 = st.columns(2)
 
-    # Chart 1: Grouped Bar Chart comparing Revenue vs Profit by Category
+    # Chart 1: Grouped bar chart comparing Revenue vs Profit by Category
     with row1_col1:
         agg_cat = filtered_df.groupby('category')[['revenue', 'profit']].sum().reset_index()
         fig1 = px.bar(
@@ -162,7 +174,7 @@ with tab1:
 with tab2:
     row2_col1, row2_col2 = st.columns(2)
 
-    # Chart 3: Histogram showing the count of Returns/Cancellations by Category
+    # Chart 3: Histogram showing count of Returns/Cancellations by Category
     with row2_col1:
         bad_orders = filtered_df[filtered_df['order_status'].isin(['Returned', 'Cancelled'])]
         fig3 = px.histogram(
@@ -176,7 +188,7 @@ with tab2:
             plot_bgcolor="rgba(0,0,0,0)", 
             paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title="Category",
-            yaxis_title="Count of Failed Orders"
+            yaxis_title="Count of Returns/Cancellations"
         )
         st.plotly_chart(fig3, use_container_width=True)
 
